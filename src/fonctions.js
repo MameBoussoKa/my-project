@@ -58,4 +58,9 @@ export function deconnexion() {
   afficherConnexion();
 }
 
+export function setTitreSection(titre) {
+  const titreEl = document.getElementById('titre-section');
+  if (titreEl) titreEl.textContent = titre;
+}
+
 // Ajoute ici toutes tes autres fonctions utilitaires...

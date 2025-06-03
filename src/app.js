@@ -1,3 +1,6 @@
+import { contacts, groupes } from './data.js';
+import { setTitreSection } from './fonctions.js';
+
 document.getElementById('btn-archive').onclick = function() {
   if (contactsSelectionnes.length === 0) {
     afficherArchives();
@@ -10,7 +13,8 @@ document.getElementById('btn-archive').onclick = function() {
   });
   contactsSelectionnes = [];
   afficherContacts();
-};import { contacts, groupes } from './data.js';
+};
+
 function afficherAjoutMembres(groupe) {
  
   if (groupe.createurId !== currentUserId) {
@@ -228,19 +232,21 @@ function afficherGroupes() {
     liste.appendChild(div);
   });
 
-  
+  // Supprime l'ancien bouton s'il existe
   let btnPlus = document.getElementById('btn-ajouter-groupe');
-  if (!btnPlus) {
-    btnPlus = document.createElement('button');
-    btnPlus.id = 'btn-ajouter-groupe';
-    btnPlus.className = "fixed bottom-8 left-1/4 transform -translate-x-1/2 bg-yellow-400 hover:bg-yellow-500 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg z-50";
-    const icon = document.createElement('span');
-    icon.className = "material-icons text-3xl";
-    icon.textContent = "add";
-    btnPlus.appendChild(icon);
-    btnPlus.onclick = afficherFormulaireGroupe;
-    document.body.appendChild(btnPlus);
-  }
+  if (btnPlus) btnPlus.remove();
+
+  // Crée le bouton et ajoute-le à la suite de la liste
+  btnPlus = document.createElement('button');
+  btnPlus.id = 'btn-ajouter-groupe';
+  btnPlus.className = "mt-4 flex items-center justify-center bg-yellow-400 hover:bg-yellow-500 text-white rounded-full w-full py-2";
+  const icon = document.createElement('span');
+  icon.className = "material-icons mr-2";
+  icon.textContent = "add";
+  btnPlus.appendChild(icon);
+  btnPlus.appendChild(document.createTextNode("Ajouter un groupe"));
+  btnPlus.onclick = afficherFormulaireGroupe;
+  liste.appendChild(btnPlus);
 }
 
 function afficherFormulaireGroupe() {
@@ -322,15 +328,29 @@ function afficherFormulaireGroupe() {
   btnValider.onclick = () => {
     const nom = inputNom.value.trim();
     const description = inputDesc.value.trim();
-    const membres = Array.from(membresDiv.querySelectorAll('input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
-    if (!nom || !description) {
-      errorDiv.textContent = "Veuillez remplir tous les champs.";
+    // Récupère les membres sélectionnés (hors utilisateur courant)
+    let membres = Array.from(membresDiv.querySelectorAll('input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
+
+    // Ajoute l'utilisateur courant s'il n'est pas déjà dans la sélection
+    if (!membres.includes(currentUserId)) {
+      membres.unshift(currentUserId);
+    }
+
+    if (!nom) {
+      errorDiv.textContent = "Veuillez saisir un nom de groupe.";
       return;
     }
+    if (!description) {
+      errorDiv.textContent = "Veuillez saisir une description.";
+      return;
+    }
+    // Il faut au moins 2 membres (l'utilisateur + au moins un contact)
     if (membres.length < 2) {
-      errorDiv.textContent = "Veuillez sélectionner au moins 2 membres.";
+      errorDiv.textContent = "Veuillez sélectionner au moins un contact en plus de vous.";
       return;
     }
+    errorDiv.textContent = "";
+
     groupes.push({
       id: Date.now(),
       nom,
@@ -338,7 +358,7 @@ function afficherFormulaireGroupe() {
       profil: nom[0],
       membres,
       createurId: currentUserId,
-      admins: [currentUserId] // <-- ajoute cette ligne
+      admins: [currentUserId]
     });
     afficherGroupes();
   };
@@ -414,22 +434,39 @@ function ajouterContact() {
     document.getElementById('contact-phone').after(errorDiv);
   }
 
+  // Validation du nom
+  if (!nomBase) {
+    errorDiv.textContent = "Veuillez saisir un nom.";
+    return;
+  }
 
+  // Vérifie que chaque mot commence par une majuscule
+  const mots = nomBase.split(' ');
+  const tousMaj = mots.every(mot => mot[0] && mot[0] === mot[0].toUpperCase() && /[A-ZÀ-Ÿ]/.test(mot[0]));
+  if (!tousMaj) {
+    errorDiv.textContent = "Chaque nom et prénom doit commencer par une lettre majuscule.";
+    return;
+  }
+
+  // Validation du téléphone
+  if (!phone) {
+    errorDiv.textContent = "Veuillez saisir un numéro de téléphone.";
+    return;
+  }
   if (!/^\d+$/.test(phone)) {
     errorDiv.textContent = "Le numéro de téléphone doit contenir uniquement des chiffres.";
     return;
   }
-
   const existe = contacts.some(c => c.phone === phone);
   if (existe) {
     errorDiv.textContent = "Ce numéro existe déjà.";
     return;
   }
 
- 
+  // Validation du nom unique (insensible à la casse)
   let nom = nomBase;
   let compteur = 2;
-  while (contacts.some(c => c.nom === nom)) {
+  while (contacts.some(c => c.nom.toLowerCase() === nom.toLowerCase())) {
     nom = nomBase + compteur;
     compteur++;
   }
@@ -691,20 +728,31 @@ document.querySelectorAll('.bg-yellow-200').forEach(el => el.classList.remove('b
 
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-nouveau').onclick = function() {
+    setSidebarSelection('btn-nouveau');
     afficherFormulaire();
   };
   document.getElementById('annuler-nouveau').onclick = cacherFormulaire;
   document.getElementById('valider-nouveau').onclick = ajouterContact;
-  document.getElementById('btn-message').onclick = afficherContacts; // <-- Ajoute cette ligne
-  document.getElementById('btn-groupes').onclick = afficherGroupes;
-  document.getElementById('btn-diffusion').onclick = afficherDiffusion;
-  // Bouton archive colonne de gauche : affiche les archives
-  const btnArchive = document.getElementById('btn-archive');
-  if (btnArchive) {
-    btnArchive.onclick = function() {
-      afficherArchives();
-    };
-  }
+  document.getElementById('btn-message').onclick = function() {
+    setSidebarSelection('btn-message');
+    setTitreSection("Discussions");
+    afficherContacts();
+  };
+  document.getElementById('btn-groupes').onclick = function() {
+    setSidebarSelection('btn-groupes');
+    setTitreSection("Groupes");
+    afficherGroupes();
+  };
+  document.getElementById('btn-diffusion').onclick = function() {
+    setSidebarSelection('btn-diffusion');
+    setTitreSection("Diffusion");
+    afficherDiffusion();
+  };
+  document.getElementById('btn-archive').onclick = function() {
+    setSidebarSelection('btn-archive');
+    setTitreSection("Archives");
+    afficherArchives();
+  };
 
   // Icône archive entête : archive les contacts sélectionnés
   const btnArchiveEntete = document.getElementById('btn-archive-entete');
@@ -874,3 +922,22 @@ window.addEventListener('DOMContentLoaded', () => {
     btnLogout.onclick = deconnexion;
   }
 });
+
+function setSidebarSelection(btnId) {
+  const ids = ['btn-message', 'btn-groupes', 'btn-diffusion', 'btn-archive', 'btn-nouveau'];
+  ids.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.remove('bg-yellow-300');
+  });
+  const selected = document.getElementById(btnId);
+  if (selected) selected.classList.add('bg-yellow-300');
+}
+
+// Handler pour le bouton "Nouveau"
+document.getElementById('btn-nouveau').onclick = function() {
+  setSidebarSelection('btn-nouveau');
+  afficherFormulaire();
+};
+
+// Si tu appelles afficherFormulaire() ailleurs (ex : après ajout ou annulation), 
+// pense à rappeler setSidebarSelection('btn-nouveau') juste avant ou après.
