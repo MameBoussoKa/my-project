@@ -8,5 +8,12 @@ export const groupes = [
     nom: "Breukh",
     description: "tay ngen dé dé",
     profil: "B"
+  },
+  {
+    id: 2,
+    nom: "Mon Groupe",
+    membres: [1, 2, 3],
+    createurId: 1,
+    admins: [1] // <-- liste des admins
   }
 ];

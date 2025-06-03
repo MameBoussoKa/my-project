@@ -83,29 +83,38 @@ function afficherAjoutMembres(groupe) {
 const currentUserId = 1;
 
 let contactsSelectionnes = [];
+let contactActif = null;
+let groupeActif = null;
+let messagesGroupes = {}; // { groupeId: [ {texte, auteur, date} ] }
 
 function afficherContacts() {
-  
   const liste = document.getElementById('liste-contacts');
   liste.innerHTML = '';
 
- 
   const btnPlus = document.getElementById('btn-ajouter-groupe');
   if (btnPlus) btnPlus.remove();
 
-  
   let inputRecherche = document.getElementById('recherche-contact');
-  
+
   function renderContacts() {
     liste.innerHTML = '';
     const recherche = inputRecherche.value.trim().toLowerCase();
-    const contactsTries = [...contacts]
-      .filter(contact =>
-        !contact.archive &&
-        (contact.nom.toLowerCase().includes(recherche) ||
-         contact.phone.includes(recherche))
-      )
-      .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
+
+    let contactsTries;
+    if (recherche === '*') {
+      // Affiche tous les contacts non archivés, triés par nom
+      contactsTries = [...contacts]
+        .filter(contact => !contact.archive)
+        .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
+    } else {
+      contactsTries = [...contacts]
+        .filter(contact =>
+          !contact.archive &&
+          (contact.nom.toLowerCase().includes(recherche) ||
+           contact.phone.includes(recherche))
+        )
+        .sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
+    }
 
     contactsTries.forEach(contact => {
       const div = document.createElement('div');
@@ -137,14 +146,12 @@ function afficherContacts() {
       liste.appendChild(div);
 
       div.onclick = function() {
-        const index = contactsSelectionnes.indexOf(contact.id);
-        if (index === -1) {
-          contactsSelectionnes.push(contact.id);
-          div.classList.add('bg-yellow-200');
-        } else {
-          contactsSelectionnes.splice(index, 1);
-          div.classList.remove('bg-yellow-200');
-        }
+        contactActif = contact;
+        contactsSelectionnes = [contact.id];
+        document.querySelectorAll('.bg-yellow-200').forEach(el => el.classList.remove('bg-yellow-200'));
+        div.classList.add('bg-yellow-200');
+        afficherProfilContact();
+        afficherMessages(); // Ajoute cette ligne
       };
     });
   }
@@ -212,7 +219,11 @@ function afficherGroupes() {
     div.onclick = function(e) {
      
       if (e.target.tagName === "BUTTON" || e.target.closest("button")) return;
-      afficherMembresGroupe(groupe);
+      groupeActif = groupe;
+      contactActif = null;
+      afficherProfilGroupe();
+      afficherMessagesGroupe();
+      afficherMembresGroupe(groupe); // <-- Ajoute cette ligne
     };
     liste.appendChild(div);
   });
@@ -326,7 +337,8 @@ function afficherFormulaireGroupe() {
       description,
       profil: nom[0],
       membres,
-      createurId: currentUserId
+      createurId: currentUserId,
+      admins: [currentUserId] // <-- ajoute cette ligne
     });
     afficherGroupes();
   };
@@ -431,69 +443,52 @@ function ajouterContact() {
   }
 }
 
-// function afficherDiffusion() {
+function afficherDiffusion() {
+  const btnPlus = document.getElementById('btn-ajouter-groupe');
+  if (btnPlus) btnPlus.remove();
+  const liste = document.getElementById('liste-contacts');
+  liste.innerHTML = '';
+  const titre = document.createElement('h3');
+  titre.className = "text-lg font-semibold mb-2";
+  titre.textContent = "Sélectionnez les contacts à diffuser";
+  liste.appendChild(titre);
 
-// const btnPlus = document.getElementById('btn-ajouter-groupe');
-// if (btnPlus) btnPlus.remove();
-//   const liste = document.getElementById('liste-contacts');
-//   liste.innerHTML = '';
-//   const titre = document.createElement('h3');
-//   titre.className = "text-lg font-semibold mb-2";
-//   titre.textContent = "Sélectionnez les contacts à diffuser";
-//   liste.appendChild(titre);
+  const form = document.createElement('form');
+  form.className = "mb-4";
 
-//   const form = document.createElement('form');
-//   form.className = "mb-4";
+  // Liste des contacts à cocher
+  contacts.forEach(contact => {
+    if (contact.archive) return;
+    const label = document.createElement('label');
+    label.className = "flex items-center mb-1";
+    const checkbox = document.createElement('input');
+    checkbox.type = "checkbox";
+    checkbox.value = contact.id;
+    checkbox.className = "mr-2";
+    checkbox.checked = contactsSelectionnes.includes(contact.id);
+    checkbox.onchange = function() {
+      if (checkbox.checked) {
+        if (!contactsSelectionnes.includes(contact.id)) contactsSelectionnes.push(contact.id);
+      } else {
+        contactsSelectionnes = contactsSelectionnes.filter(id => id !== contact.id);
+      }
+    };
+    label.appendChild(checkbox);
 
- 
-//   const errorDiv = document.createElement('div');
-//   errorDiv.className = "text-red-500 text-xs mb-2";
-//   form.appendChild(errorDiv);
+    const strong = document.createElement('strong');
+    strong.textContent = contact.nom;
+    label.appendChild(strong);
 
-//   form.onsubmit = function(e) {
-//     e.preventDefault();
-//     const selection = Array.from(form.querySelectorAll('input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
-//     if (selection.length === 0) {
-//       errorDiv.textContent = "Sélectionnez au moins un contact.";
-//       return;
-//     } else {
-//       errorDiv.textContent = "";
-//     }
-   
-//     afficherContacts();
-//   };
+    const phoneSpan = document.createElement('span');
+    phoneSpan.className = "ml-2 text-sm text-gray-500";
+    phoneSpan.textContent = contact.phone;
+    label.appendChild(phoneSpan);
 
-//   contacts.forEach(contact => {
-//     if (contact.archive) return;
-//     const label = document.createElement('label');
-//     label.className = "flex items-center mb-1";
-//     const checkbox = document.createElement('input');
-//     checkbox.type = "checkbox";
-//     checkbox.value = contact.id;
-//     checkbox.className = "mr-2";
-//     label.appendChild(checkbox);
+    form.appendChild(label);
+  });
 
-//     const strong = document.createElement('strong');
-//     strong.textContent = contact.nom;
-//     label.appendChild(strong);
-
-//     const phoneSpan = document.createElement('span');
-//     phoneSpan.className = "ml-2 text-sm text-gray-500";
-//     phoneSpan.textContent = contact.phone;
-//     label.appendChild(phoneSpan);
-
-//     form.appendChild(label);
-//   });
-
- 
-//   const btnEnvoyer = document.createElement('button');
-//   btnEnvoyer.type = "submit";
-//   btnEnvoyer.className = "mt-3 px-4 py-1 rounded bg-yellow-400 text-white";
-//   btnEnvoyer.textContent = "Envoyer";
-//   form.appendChild(btnEnvoyer);
-
-//   liste.appendChild(form);
-// }
+  liste.appendChild(form);
+}
 
 function afficherArchives() {
   // Supprime le bouton "ajouter un groupe" s'il existe
@@ -556,6 +551,11 @@ if (btnPlus) btnPlus.remove();
 }
 
 function afficherMembresGroupe(groupe) {
+  // S'assure que la propriété admins existe toujours
+  if (!groupe.admins) {
+    groupe.admins = [groupe.createurId];
+  }
+
   const liste = document.getElementById('liste-contacts');
   liste.innerHTML = '';
 
@@ -601,6 +601,35 @@ function afficherMembresGroupe(groupe) {
 
         div.appendChild(profilDiv);
         div.appendChild(infoDiv);
+
+        // Bouton retirer (si admin et pas le créateur lui-même)
+        if (groupe.createurId === currentUserId && id !== groupe.createurId) {
+          const btnRetirer = document.createElement('button');
+          btnRetirer.className = "ml-2 px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200 text-xs";
+          btnRetirer.textContent = "Retirer";
+          btnRetirer.onclick = function() {
+            groupe.membres = groupe.membres.filter(mid => mid !== id);
+            afficherMembresGroupe(groupe);
+          };
+          div.appendChild(btnRetirer);
+        }
+
+        // Bouton rendre admin (si admin et que ce n'est pas le créateur)
+        if (
+          groupe.admins.includes(currentUserId) && // tu es admin
+          !groupe.admins.includes(id) &&           // le membre n'est pas déjà admin
+          id !== groupe.createurId                 // on ne touche pas au créateur
+        ) {
+          const btnAdmin = document.createElement('button');
+          btnAdmin.className = "ml-2 px-2 py-1 rounded bg-blue-100 text-blue-600 hover:bg-blue-200 text-xs";
+          btnAdmin.textContent = "Rendre admin";
+          btnAdmin.onclick = function() {
+            groupe.admins.push(id);
+            afficherMembresGroupe(groupe);
+          };
+          div.appendChild(btnAdmin);
+        }
+
         liste.appendChild(div);
       }
     });
@@ -625,6 +654,38 @@ function afficherMembresGroupe(groupe) {
   }
 }
 
+function afficherProfilContact() {
+  const profilDiv = document.getElementById('profil-entete');
+  const nomSpan = document.getElementById('nom-entete');
+  if (!profilDiv || !nomSpan) return;
+  if (contactActif) {
+    // Initiales
+    const noms = contactActif.nom.trim().split(' ');
+    let initiales = noms[0][0] ? noms[0][0].toUpperCase() : '';
+    if (noms.length > 1 && noms[1][0]) {
+      initiales += noms[1][0].toUpperCase();
+    }
+    profilDiv.textContent = initiales || "?";
+    nomSpan.textContent = contactActif.nom;
+  } else {
+    profilDiv.textContent = "";
+    nomSpan.textContent = "";
+  }
+}
+
+function afficherProfilGroupe() {
+  const profilDiv = document.getElementById('profil-entete');
+  const nomSpan = document.getElementById('nom-entete');
+  if (!profilDiv || !nomSpan) return;
+  if (groupeActif) {
+    profilDiv.textContent = groupeActif.profil || (groupeActif.nom[0] ? groupeActif.nom[0].toUpperCase() : "?");
+    nomSpan.textContent = groupeActif.nom;
+  } else {
+    profilDiv.textContent = "";
+    nomSpan.textContent = "";
+  }
+}
+
 // Nettoie la sélection visuelle si besoin
 document.querySelectorAll('.bg-yellow-200').forEach(el => el.classList.remove('bg-yellow-200'));
 
@@ -637,27 +698,179 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-message').onclick = afficherContacts; // <-- Ajoute cette ligne
   document.getElementById('btn-groupes').onclick = afficherGroupes;
   document.getElementById('btn-diffusion').onclick = afficherDiffusion;
+  // Bouton archive colonne de gauche : affiche les archives
   const btnArchive = document.getElementById('btn-archive');
   if (btnArchive) {
     btnArchive.onclick = function() {
       afficherArchives();
     };
   }
-  document.getElementById('btn-archive-entete').onclick = function() {
-  console.log("Clic sur archive entête !");
-  if (contactsSelectionnes.length === 0) {
-    alert("Sélectionnez au moins un contact à archiver.");
+
+  // Icône archive entête : archive les contacts sélectionnés
+  const btnArchiveEntete = document.getElementById('btn-archive-entete');
+  if (btnArchiveEntete) {
+    btnArchiveEntete.onclick = function() {
+      if (contactsSelectionnes.length === 0) {
+        // On ne fait rien si aucun contact n'est sélectionné
+        return;
+      }
+      contacts.forEach(contact => {
+        if (contactsSelectionnes.includes(contact.id)) {
+          contact.archive = true;
+        }
+      });
+      document.querySelectorAll('.bg-yellow-200').forEach(el => el.classList.remove('bg-yellow-200'));
+      contactsSelectionnes = [];
+      afficherContacts();
+      // alert("Contacts archivés !"); // <-- SUPPRIMÉ
+    };
+  }
+  afficherContacts(); // 
+});
+
+let messages = {}; // { contactId: [ {texte, auteur, date} ] }
+function afficherMessages() {
+  const zone = document.getElementById('zone-messages');
+  zone.innerHTML = '';
+  if (!contactActif) {
+    zone.innerHTML = '<div class="text-gray-400 text-center mt-10">Sélectionnez un contact pour voir la conversation.</div>';
     return;
   }
-  contacts.forEach(contact => {
-    if (contactsSelectionnes.includes(contact.id)) {
-      contact.archive = true;
-    }
+  const msgs = messages[contactActif.id] || [];
+  msgs.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = "mb-2 flex " + (msg.auteur === 'moi' ? "justify-end" : "justify-start");
+    div.innerHTML = `<span class="px-3 py-2 rounded bg-green-500 text-white">${msg.texte}</span>`;
+    zone.appendChild(div);
   });
-  document.querySelectorAll('.bg-yellow-200').forEach(el => el.classList.remove('bg-yellow-200'));
-  contactsSelectionnes = [];
-  afficherContacts();
-  alert("Contacts archivés !");
-};
-  afficherContacts(); // 
+}
+
+// Envoi de message
+  const inputMsg = document.querySelector('.flex-1.border.rounded.px-4.py-2');
+  const btnSend = document.querySelector('.bg-green-500.text-white.p-2.rounded-full');
+  if (btnSend && inputMsg) {
+    btnSend.onclick = function() {
+      const texte = inputMsg.value.trim();
+      if (!texte) return;
+      // Si plusieurs contacts sélectionnés (diffusion)
+      if (contactsSelectionnes.length > 1) {
+        contactsSelectionnes.forEach(id => {
+          if (!messages[id]) messages[id] = [];
+          messages[id].push({ texte, auteur: 'moi', date: new Date() });
+        });
+        inputMsg.value = '';
+        // Affiche une confirmation
+        const info = document.getElementById('diffusion-info');
+        if (info) {
+          info.textContent = "Message diffusé à " + contactsSelectionnes.length + " contacts.";
+          setTimeout(() => { info.textContent = ""; }, 3000); // Efface après 3 secondes
+        }
+        // Affiche la confirmation au centre de la zone de messages
+const zone = document.getElementById('zone-messages');
+if (zone) {
+  zone.innerHTML = `<div class="flex items-center justify-center h-full">
+    <div class="bg-green-100 text-green-700 px-6 py-4 rounded shadow text-lg font-semibold">
+      Message diffusé à ${contactsSelectionnes.length} contacts.
+    </div>
+  </div>`;
+  setTimeout(() => {
+    zone.innerHTML = '<div class="text-gray-400 text-center mt-10">Sélectionnez un contact pour voir la conversation.</div>';
+  }, 2000); // Efface après 2 secondes
+}
+        return;
+      }
+      // Sinon, message classique
+      if (contactActif) {
+        if (!messages[contactActif.id]) messages[contactActif.id] = [];
+        messages[contactActif.id].push({ texte, auteur: 'moi', date: new Date() });
+        afficherMessages();
+      } else if (groupeActif) {
+        if (!messagesGroupes[groupeActif.id]) messagesGroupes[groupeActif.id] = [];
+        messagesGroupes[groupeActif.id].push({ texte, auteur: 'moi', date: new Date() });
+        afficherMessagesGroupe();
+      } else {
+        alert("Sélectionnez un contact ou un groupe !");
+        return;
+      }
+      inputMsg.value = '';
+    };
+    inputMsg.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnSend.click();
+      }
+    });
+  }
+
+function afficherMessagesGroupe() {
+  const zone = document.getElementById('zone-messages');
+  zone.innerHTML = '';
+  if (!groupeActif) {
+    zone.innerHTML = '<div class="text-gray-400 text-center mt-10">Sélectionnez un groupe pour voir la conversation.</div>';
+    return;
+  }
+  const msgs = messagesGroupes[groupeActif.id] || [];
+  msgs.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = "mb-2 flex " + (msg.auteur === 'moi' ? "justify-end" : "justify-start");
+    div.innerHTML = `<span class="px-3 py-2 rounded bg-green-200">${msg.texte}</span>`;
+    zone.appendChild(div);
+  });
+}
+
+let currentUser = null;
+
+function afficherConnexion() {
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('app-main').style.display = 'none';
+}
+
+function connexionReussie(user) {
+  currentUser = user;
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app-main').style.display = '';
+  // Enlève le message sous la barre de recherche
+  const header = document.getElementById('user-connecte');
+  if (header) {
+    header.innerHTML = "";
+  }
+}
+
+// Au chargement, affiche la page de connexion
+window.addEventListener('DOMContentLoaded', () => {
+  afficherConnexion();
+  document.getElementById('btn-login').onclick = function() {
+    const nom = document.getElementById('login-nom').value.trim();
+    const numero = document.getElementById('login-numero').value.trim();
+    const errorDiv = document.getElementById('login-error');
+    if (!nom || !numero) {
+      errorDiv.textContent = "Veuillez remplir tous les champs.";
+      return;
+    }
+    // Vérifie si le contact existe déjà
+    const user = contacts.find(c => c.nom === nom && c.phone === numero && !c.archive);
+    if (user) {
+      connexionReussie(user);
+    } else {
+      errorDiv.textContent = "Nom ou numéro incorrect.";
+    }
+  };
+});
+
+// Fonction de déconnexion
+function deconnexion() {
+  currentUser = null;
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('app-main').style.display = 'none';
+  // Optionnel : efface les champs de connexion
+  document.getElementById('login-nom').value = '';
+  document.getElementById('login-numero').value = '';
+}
+
+// Ajoute l'écouteur sur le bouton logout après le chargement
+window.addEventListener('DOMContentLoaded', () => {
+  const btnLogout = document.getElementById('btn-logout');
+  if (btnLogout) {
+    btnLogout.onclick = deconnexion;
+  }
 });
